@@ -3,8 +3,12 @@ name: Flutter CI
 on:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -13,6 +17,12 @@ jobs:
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
+
+      - name: Installer Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Installer Flutter
         uses: subosito/flutter-action@v2
@@ -25,8 +35,36 @@ jobs:
       - name: Vérifier le code
         run: flutter analyze
 
-      - name: Configurer le projet Web
-        run: flutter create . --platforms web
+      - name: Configurer les plateformes
+        run: flutter create . --platforms web,android
+
+      - name: Autoriser Internet (Android)
+        run: sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' android/app/src/main/AndroidManifest.xml
 
       - name: Construire l'application Web
-        run: flutter build web --release
+        run: flutter build web --release --base-href "/Infos-/"
+
+      - name: Construire l'APK
+        run: flutter build apk --release
+
+      - name: Préparer le site pour Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Sauvegarder l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publier sur GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
