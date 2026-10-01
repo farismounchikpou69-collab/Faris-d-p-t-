@@ -25,5 +25,8 @@ jobs:
       - name: Vérifier le code
         run: flutter analyze
 
+      - name: Configurer le projet Web
+        run: flutter create . --platforms web
+
       - name: Construire l'application Web
         run: flutter build web --release
