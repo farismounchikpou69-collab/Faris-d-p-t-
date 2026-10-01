@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import 'models/news_article.dart';
 import 'services/news_api_service.dart';
 
@@ -37,6 +39,8 @@ class _NewsHomeState extends State<NewsHome> {
     const String.fromEnvironment('NEWS_API_KEY'),
   );
 
+  final TextEditingController searchController = TextEditingController();
+
   List<NewsArticle> articles = [];
   bool loading = false;
   String error = '';
@@ -45,6 +49,12 @@ class _NewsHomeState extends State<NewsHome> {
   void initState() {
     super.initState();
     loadNews();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
   }
 
   Future<void> loadNews() async {
@@ -67,14 +77,16 @@ class _NewsHomeState extends State<NewsHome> {
 
       setState(() {
         loading = false;
-        error = 'Impossible de charger les actualités.';
+        error = 'Impossible de charger les actualités : $e';
       });
     }
   }
 
   Future<void> searchNews(String query) async {
-    if (query.trim().isEmpty) {
-      await loadNews();
+    final text = query.trim();
+
+    if (text.isEmpty) {
+      loadNews();
       return;
     }
 
@@ -84,7 +96,7 @@ class _NewsHomeState extends State<NewsHome> {
     });
 
     try {
-      final result = await api.search(query);
+      final result = await api.search(text);
 
       if (!mounted) return;
 
@@ -97,9 +109,35 @@ class _NewsHomeState extends State<NewsHome> {
 
       setState(() {
         loading = false;
-        error = 'Recherche impossible.';
+        error = 'Recherche impossible : $e';
       });
     }
+  }
+
+  Future<void> openArticle(String url) async {
+    final uri = Uri.tryParse(url);
+
+    if (uri == null) return;
+
+    final ok = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Impossible d'ouvrir le lien.")),
+      );
+    }
+  }
+
+  String formatDate(DateTime date) {
+    final d = date.toLocal();
+    final day = d.day.toString().padLeft(2, '0');
+    final month = d.month.toString().padLeft(2, '0');
+    final hour = d.hour.toString().padLeft(2, '0');
+    final minute = d.minute.toString().padLeft(2, '0');
+    return '$day/$month/${d.year} à $hour:$minute';
   }
 
   @override
@@ -109,8 +147,8 @@ class _NewsHomeState extends State<NewsHome> {
         title: const Text('World AI News'),
         actions: [
           IconButton(
-            onPressed: loadNews,
             icon: const Icon(Icons.refresh),
+            onPressed: loading ? null : loadNews,
           ),
         ],
       ),
@@ -119,37 +157,32 @@ class _NewsHomeState extends State<NewsHome> {
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
+              controller: searchController,
+              textInputAction: TextInputAction.search,
               onSubmitted: searchNews,
               decoration: InputDecoration(
                 hintText: 'Rechercher une actualité...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
             ),
           ),
-          if (loading)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(),
-            ),
+          if (loading) const LinearProgressIndicator(),
           if (error.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Text(
                 error,
-                style: const TextStyle(
-                  color: Colors.red,
-                ),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
               ),
             ),
           Expanded(
             child: articles.isEmpty && !loading
                 ? const Center(
-                    child: Text(
-                      'Aucune actualité disponible.',
-                    ),
+                    child: Text('Aucune actualité disponible.'),
                   )
                 : ListView.builder(
                     itemCount: articles.length,
@@ -161,35 +194,39 @@ class _NewsHomeState extends State<NewsHome> {
                           horizontal: 12,
                           vertical: 6,
                         ),
-                        child: ListTile(
-                          leading: article.imageUrl != null &&
-                                  article.imageUrl!.isNotEmpty
-                              ? Image.network(
-                                  article.imageUrl!,
-                                  width: 80,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                  errorBuilder:
-                                      (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.image_not_supported,
-                                    );
-                                  },
-                                )
-                              : const Icon(
-                                  Icons.article,
-                                  size: 50,
+                        child: InkWell(
+                          onTap: () => openArticle(article.url),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  article.title,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                          title: Text(
-                            article.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                                if (article.description != null) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    article.description!,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${article.source} • ${formatDate(article.publishedAt)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          subtitle: Text(
-                            '${article.source}\n${_formatDate(article.publishedAt)}',
-                            maxLines: 2,
-                          ),
-                          isThreeLine: true,
                         ),
                       );
                     },
@@ -198,18 +235,5 @@ class _NewsHomeState extends State<NewsHome> {
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final localDate = date.toLocal();
-
-    final day = localDate.day.toString().padLeft(2, '0');
-    final month = localDate.month.toString().padLeft(2, '0');
-    final year = localDate.year.toString();
-
-    final hour = localDate.hour.toString().padLeft(2, '0');
-    final minute = localDate.minute.toString().padLeft(2, '0');
-
-    return '$day/$month/$year à $hour:$minute';
   }
 }
