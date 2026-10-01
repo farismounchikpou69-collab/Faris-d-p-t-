@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -47,16 +47,19 @@ jobs:
       - name: Construire l'APK
         run: flutter build apk --release --dart-define=NEWS_API_KEY=${{ secrets.NEWS_API_KEY }}
 
+      - name: Publier l'APK dans Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.${{ github.run_number }}" \
+            build/app/outputs/flutter-apk/app-release.apk \
+            --title "World AI News v1.${{ github.run_number }}" \
+            --notes "APK Android généré automatiquement."
+
       - name: Préparer le site pour Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
-
-      - name: Sauvegarder l'APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
 
   deploy:
     needs: build
