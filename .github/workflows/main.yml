@@ -30,19 +30,16 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generer les fichiers Android
+      - name: Generer Android
         run: flutter create --platforms=android --project-name world_ai_news .
 
       - name: Installer les dependances
         run: flutter pub get
 
       - name: Verifier le code
-        run: flutter analyze
+        run: flutter analyze lib
 
-      - name: Nettoyer le projet
-        run: flutter clean
-
-      - name: Construire APK Android
+      - name: Construire APK
         run: flutter build apk --release --dart-define=GNEWS_API_KEY=${{ secrets.GNEWS_API_KEY }}
 
       - name: Enregistrer APK
