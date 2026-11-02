@@ -1,3 +1,4 @@
+
 class NewsArticle {
   final String title;
   final String? description;
@@ -8,7 +9,7 @@ class NewsArticle {
 
   NewsArticle({
     required this.title,
-    required this.description,
+    this.description,
     required this.url,
     required this.source,
     required this.publishedAt,
@@ -16,16 +17,26 @@ class NewsArticle {
   });
 
   factory NewsArticle.fromJson(Map<String, dynamic> json) {
+    final sourceData = json['source'];
+
     return NewsArticle(
-      title: json['title'] ?? 'Sans titre',
-      description: json['description'],
-      url: json['url'] ?? '',
-      source: json['source']?['name'] ?? 'Source inconnue',
+      title: json['title']?.toString() ?? 'Sans titre',
+
+      description: json['description']?.toString(),
+
+      url: json['url']?.toString() ?? '',
+
+      source: sourceData is Map
+          ? sourceData['name']?.toString() ?? 'Source inconnue'
+          : 'Source inconnue',
+
       publishedAt: DateTime.tryParse(
-            json['publishedAt'] ?? '',
+            json['publishedAt']?.toString() ?? '',
           ) ??
           DateTime.now(),
-      imageUrl: json['urlToImage'],
+
+      // GNews utilise "image", et non "urlToImage".
+      imageUrl: json['image']?.toString(),
     );
   }
 }
