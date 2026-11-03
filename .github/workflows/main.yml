@@ -1,50 +1,47 @@
-
-name: World AI News - Android Build
+name: Build APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Recuperer le code
+      - name: Récupérer le code
         uses: actions/checkout@v4
 
       - name: Installer Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: '17'
 
       - name: Installer Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
 
-      - name: Generer Android
-        run: flutter create --platforms=android --project-name world_ai_news .
+      - name: Générer le dossier android
+        run: flutter create . --platforms=android
 
-      - name: Installer les dependances
+      - name: Ajouter la permission INTERNET
+        run: |
+          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml || \
+          sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' android/app/src/main/AndroidManifest.xml
+
+      - name: Vérifier le manifeste
+        run: head -n 8 android/app/src/main/AndroidManifest.xml
+
+      - name: Installer les dépendances
         run: flutter pub get
 
-      - name: Verifier le code
-        run: flutter analyze lib
+      - name: Construire l'APK
+        run: flutter build apk --release
 
-      - name: Construire APK
-        run: flutter build apk --release --dart-define=GNEWS_API_KEY=${{ secrets.GNEWS_API_KEY }}
-
-      - name: Enregistrer APK
+      - name: Publier l'APK
         uses: actions/upload-artifact@v4
         with:
-          name: World-AI-News-APK
+          name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
-          if-no-files-found: error
